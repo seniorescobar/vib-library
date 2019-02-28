@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strings"
 	"vib-library/library/database"
-	"vib-library/library/structs"
 )
 
 // errors
@@ -53,14 +52,8 @@ func (lib *library) AddMember(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// create new member instance
-	newMember := structs.Member{
-		FirstName: req.Form.Get("firstName"),
-		LastName:  req.Form.Get("lastName"),
-	}
-
 	// add member to database
-	if err := lib.db.AddMember(newMember); err != nil {
+	if err := lib.db.AddMember(req.Form.Get("firstName"), req.Form.Get("lastName")); err != nil {
 		log.Println(err) // log internal server error
 		http.Error(w, "error adding user", http.StatusInternalServerError)
 		return

@@ -41,9 +41,9 @@ func (db Database) Ping() bool {
 	return true
 }
 
-func (db Database) AddMember(newMember structs.Member) error {
+func (db Database) AddMember(firstName, lastName string) error {
 	stmt := `INSERT INTO member (first_name, last_name) VALUES ($1, $2)`
-	_, err := db.conn.Exec(stmt, newMember.FirstName, newMember.LastName)
+	_, err := db.conn.Exec(stmt, firstName, lastName)
 	return err
 }
 
