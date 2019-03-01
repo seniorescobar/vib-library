@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 	"vib-library/library/structs"
@@ -73,15 +74,77 @@ func (db Database) GetMembers() ([]structs.Member, error) {
 }
 
 func (db Database) RentBook(memberId, bookId string) error {
-	stmt := `INSERT INTO rent (member_id, book_id, time) VALUES ($1, $2, $3)`
-	_, err := db.conn.Exec(stmt, memberId, bookId, time.Now())
-	return err
+	// check if book available
+	var available bool
+	stmt := `SELECT amount > 0 FROM availability WHERE book_id=$1`
+	err := db.conn.QueryRow(stmt, bookId).Scan(&available)
+	if err != nil {
+		return err
+	}
+
+	if available == false {
+		return errors.New("book unavailable")
+	}
+
+	// begin transaction
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	// rent book
+	stmt = `INSERT INTO rent (member_id, book_id, time) VALUES ($1, $2, $3)`
+	_, err = tx.Exec(stmt, memberId, bookId, time.Now())
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// change availabile amount
+	stmt = `UPDATE availability SET amount=amount-1 WHERE book_id=$1`
+	_, err = tx.Exec(stmt, bookId)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// commit
+	return tx.Commit()
 }
 
 func (db Database) ReturnBook(rentId string) error {
-	stmt := `UPDATE rent SET time_return=$2 WHERE id=$1`
-	_, err := db.conn.Exec(stmt, rentId, time.Now())
-	return err
+	// get book id
+	var bookId string
+	stmt := `SELECT book_id FROM rent WHERE id=$1`
+	err := db.conn.QueryRow(stmt, rentId).Scan(&bookId)
+	if err != nil {
+		return err
+	}
+
+	// begin transaction
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+
+	// mark book as returned
+	stmt = `UPDATE rent SET time_return=$2 WHERE id=$1 AND time_return IS NULL`
+	_, err = tx.Exec(stmt, rentId, time.Now())
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// change availabile amount
+	stmt = `UPDATE availability SET amount=amount+1 WHERE book_id=$1`
+	_, err = tx.Exec(stmt, bookId)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// commit
+	return tx.Commit()
 }
 
 func (db Database) GetAvailableBooks() ([]structs.Book, error) {
