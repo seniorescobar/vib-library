@@ -87,7 +87,7 @@ func (db Database) ReturnBook(rentId string) error {
 func (db Database) GetAvailableBooks() ([]structs.Book, error) {
 	books := []structs.Book{}
 
-	stmt := `SELECT b.id, b.title, b.author, b.year, a.amount FROM book b JOIN availability a ON b.id = a.book_id`
+	stmt := `SELECT b.id, b.title, b.author, b.year, a.amount FROM book b JOIN availability a ON b.id = a.book_id WHERE a.amount > 0`
 	rows, err := db.conn.Query(stmt)
 	if err != nil {
 		return nil, err
